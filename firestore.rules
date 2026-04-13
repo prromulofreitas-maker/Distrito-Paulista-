@@ -1,0 +1,300 @@
+// ===============================================================
+// Assumed Data Model
+// ===============================================================
+//
+// Collection: users
+// Document ID: {userId}
+// Fields:
+//   - uid: string (required) - Firebase Auth UID
+//   - name: string (required, max 100) - User's full name
+//   - email: string (required, email format) - User's email address
+//   - role: string (required, in ['admin', 'leader', 'member']) - User's role
+//   - departmentId: string (optional) - ID of the department the user belongs to
+//   - createdAt: string (required, ISO 8601 date string) - Creation timestamp
+//
+// Collection: departments
+// Document ID: {departmentId}
+// Fields:
+//   - name: string (required, max 100) - Department name
+//   - description: string (optional, max 500) - Department description
+//   - createdAt: string (required, ISO 8601 date string) - Creation timestamp
+//
+// Collection: materials
+// Document ID: {materialId}
+// Fields:
+//   - title: string (required, max 200) - Material title
+//   - description: string (optional, max 1000) - Material description
+//   - url: string (required, URL format) - URL to the material
+//   - departmentId: string (required) - ID of the department
+//   - uploadedBy: string (required) - UID of the user who uploaded
+//   - createdAt: string (required, ISO 8601 date string) - Upload timestamp
+//
+// Collection: events
+// Document ID: {eventId}
+// Fields:
+//   - title: string (required, max 200) - Event title
+//   - description: string (optional, max 1000) - Event description
+//   - date: string (required, ISO 8601 date string) - Event date and time
+//   - location: string (required, max 200) - Event location
+//   - departmentId: string (optional) - ID of the department organizing
+//   - createdBy: string (required) - UID of the user who created
+//   - createdAt: string (required, ISO 8601 date string) - Creation timestamp
+//
+// Collection: tasks
+// Document ID: {taskId}
+// Fields:
+//   - title: string (required, max 200) - Task title
+//   - description: string (optional, max 1000) - Task description
+//   - dueDate: string (optional, ISO 8601 date string) - Task due date
+//   - status: string (required, in ['pending', 'completed']) - Task status
+//   - assignedTo: string (required) - UID of the user assigned
+//   - departmentId: string (required) - ID of the department
+//   - createdBy: string (required) - UID of the user who created
+//   - createdAt: string (required, ISO 8601 date string) - Creation timestamp
+//
+// Collection: announcements
+// Document ID: {announcementId}
+// Fields:
+//   - title: string (required, max 200) - Announcement title
+//   - content: string (required, max 5000) - Announcement content
+//   - departmentId: string (optional) - ID of the department
+//   - createdBy: string (required) - UID of the user who created
+//   - createdAt: string (required, ISO 8601 date string) - Creation timestamp
+//
+// ===============================================================
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && (
+        getUserData().role == 'admin' || 
+        (request.auth.token.email == "pr.romulofreitas@gmail.com" && request.auth.token.email_verified == true)
+      );
+    }
+    
+    function isLeader() {
+      return isAuthenticated() && (getUserData().role == 'leader' || isAdmin());
+    }
+    
+    function isDepartmentLeader(departmentId) {
+      let user = getUserData();
+      return isAuthenticated() && ((user.role == 'leader' && user.departmentId == departmentId) || isAdmin());
+    }
+    
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+    
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+    
+    function isValidString(field, minLen, maxLen) {
+      return request.resource.data[field] is string &&
+        request.resource.data[field].size() >= minLen &&
+        request.resource.data[field].size() <= maxLen;
+    }
+    
+    function isValidOptionalString(field, minLen, maxLen) {
+      return !(field in request.resource.data) ||
+             (request.resource.data[field] is string &&
+              request.resource.data[field].size() >= minLen &&
+              request.resource.data[field].size() <= maxLen);
+    }
+    
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+    
+    function isValidUrl(url) {
+      return url is string && (url.matches("^https://.*") || url.matches("^http://.*"));
+    }
+    
+    function isValidDateString(dateStr) {
+      return dateStr is string && dateStr.matches("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.*Z?$");
+    }
+    
+    function isValidOptionalDateString(field) {
+      return !(field in request.resource.data) || isValidDateString(request.resource.data[field]);
+    }
+    
+    function areImmutableFieldsUnchanged(fields) {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(fields);
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+    
+    function isValidUser() {
+      return hasRequiredFields(['uid', 'name', 'email', 'role', 'createdAt']) &&
+             isValidString('uid', 1, 128) &&
+             isValidString('name', 1, 100) &&
+             isValidEmail(request.resource.data.email) &&
+             request.resource.data.role in ['admin', 'leader', 'member'] &&
+             isValidOptionalString('departmentId', 1, 128) &&
+             isValidDateString(request.resource.data.createdAt);
+    }
+    
+    function isValidDepartment() {
+      return hasRequiredFields(['name', 'createdAt']) &&
+             isValidString('name', 1, 100) &&
+             isValidOptionalString('description', 0, 500) &&
+             isValidDateString(request.resource.data.createdAt);
+    }
+    
+    function isValidMaterial() {
+      return hasRequiredFields(['title', 'url', 'departmentId', 'uploadedBy', 'createdAt']) &&
+             isValidString('title', 1, 200) &&
+             isValidOptionalString('description', 0, 1000) &&
+             isValidUrl(request.resource.data.url) &&
+             isValidString('departmentId', 1, 128) &&
+             isValidString('uploadedBy', 1, 128) &&
+             isValidDateString(request.resource.data.createdAt);
+    }
+    
+    function isValidEvent() {
+      return hasRequiredFields(['title', 'date', 'location', 'createdBy', 'createdAt']) &&
+             isValidString('title', 1, 200) &&
+             isValidOptionalString('description', 0, 1000) &&
+             isValidDateString(request.resource.data.date) &&
+             isValidString('location', 1, 200) &&
+             isValidOptionalString('imageUrl', 0, 2000) &&
+             isValidOptionalString('departmentId', 1, 128) &&
+             isValidString('createdBy', 1, 128) &&
+             isValidDateString(request.resource.data.createdAt);
+    }
+    
+    function isValidTask() {
+      return hasRequiredFields(['title', 'status', 'assignedTo', 'departmentId', 'createdBy', 'createdAt']) &&
+             isValidString('title', 1, 200) &&
+             isValidOptionalString('description', 0, 1000) &&
+             isValidOptionalDateString('dueDate') &&
+             request.resource.data.status in ['pending', 'completed'] &&
+             isValidString('assignedTo', 1, 128) &&
+             isValidString('departmentId', 1, 128) &&
+             isValidString('createdBy', 1, 128) &&
+             isValidDateString(request.resource.data.createdAt);
+    }
+    
+    function isValidAnnouncement() {
+      return hasRequiredFields(['title', 'content', 'createdBy', 'createdAt']) &&
+             isValidString('title', 1, 200) &&
+             isValidString('content', 1, 5000) &&
+             isValidOptionalString('departmentId', 1, 128) &&
+             isValidString('createdBy', 1, 128) &&
+             isValidDateString(request.resource.data.createdAt);
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+    
+    function isValidMessage() {
+      return hasRequiredFields(['text', 'senderId', 'senderName', 'channelId', 'createdAt']) &&
+             isValidString('text', 1, 1000) &&
+             isValidString('senderId', 1, 128) &&
+             isValidString('senderName', 1, 100) &&
+             isValidString('channelId', 1, 128) &&
+             isValidDateString(request.resource.data.createdAt);
+    }
+
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      // Users can create their own profile as 'member', or admin can create any
+      allow create: if isAuthenticated() && isValidUser() && request.resource.data.uid == userId && (
+        (isOwner(userId) && request.resource.data.role == 'member') || isAdmin()
+      );
+      // Users can update their own profile (except role), or admin can update any
+      allow update: if isAuthenticated() && isValidUser() && areImmutableFieldsUnchanged(['uid', 'createdAt']) && (
+        (isOwner(userId) && request.resource.data.role == resource.data.role) || isAdmin()
+      );
+      allow delete: if isAdmin();
+    }
+    
+    match /departments/{departmentId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAdmin() && isValidDepartment();
+    }
+    
+    match /materials/{materialId} {
+      allow read: if isAuthenticated();
+      // Leaders can create/update materials for their department, admins can do it for any
+      allow create: if isAuthenticated() && isValidMaterial() && request.resource.data.uploadedBy == request.auth.uid && (
+        isDepartmentLeader(request.resource.data.departmentId)
+      );
+      allow update: if isAuthenticated() && isValidMaterial() && areImmutableFieldsUnchanged(['uploadedBy', 'createdAt', 'departmentId']) && (
+        isDepartmentLeader(resource.data.departmentId)
+      );
+      allow delete: if isAuthenticated() && isDepartmentLeader(resource.data.departmentId);
+    }
+    
+    match /events/{eventId} {
+      allow read: if isAuthenticated();
+      // Leaders can create events for their department, admins can create any event (including district-wide)
+      allow create: if isAuthenticated() && isValidEvent() && request.resource.data.createdBy == request.auth.uid && (
+        isAdmin() || (!('departmentId' in request.resource.data) ? false : isDepartmentLeader(request.resource.data.departmentId))
+      );
+      allow update: if isAuthenticated() && isValidEvent() && areImmutableFieldsUnchanged(['createdBy', 'createdAt', 'departmentId']) && (
+        isAdmin() || (!('departmentId' in resource.data) ? false : isDepartmentLeader(resource.data.departmentId))
+      );
+      allow delete: if isAuthenticated() && (
+        isAdmin() || (!('departmentId' in resource.data) ? false : isDepartmentLeader(resource.data.departmentId))
+      );
+    }
+    
+    match /tasks/{taskId} {
+      allow read: if isAuthenticated();
+      // Leaders can assign tasks to members of their department
+      allow create: if isAuthenticated() && isValidTask() && request.resource.data.createdBy == request.auth.uid && (
+        isDepartmentLeader(request.resource.data.departmentId)
+      );
+      // Assigned users can update status, leaders can update anything
+      allow update: if isAuthenticated() && isValidTask() && areImmutableFieldsUnchanged(['createdBy', 'createdAt', 'departmentId']) && (
+        isDepartmentLeader(resource.data.departmentId) || 
+        (request.auth.uid == resource.data.assignedTo && areImmutableFieldsUnchanged(['title', 'description', 'dueDate', 'assignedTo']))
+      );
+      allow delete: if isAuthenticated() && isDepartmentLeader(resource.data.departmentId);
+    }
+    
+    match /announcements/{announcementId} {
+      allow read: if isAuthenticated();
+      // Leaders can create announcements for their department, admins can create district-wide
+      allow create: if isAuthenticated() && isValidAnnouncement() && request.resource.data.createdBy == request.auth.uid && (
+        isAdmin() || (!('departmentId' in request.resource.data) ? false : isDepartmentLeader(request.resource.data.departmentId))
+      );
+      allow update: if isAuthenticated() && isValidAnnouncement() && areImmutableFieldsUnchanged(['createdBy', 'createdAt', 'departmentId']) && (
+        isAdmin() || (!('departmentId' in resource.data) ? false : isDepartmentLeader(resource.data.departmentId))
+      );
+      allow delete: if isAuthenticated() && (
+        isAdmin() || (!('departmentId' in resource.data) ? false : isDepartmentLeader(resource.data.departmentId))
+      );
+    }
+
+    match /messages/{messageId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && 
+                    isValidMessage() && 
+                    request.resource.data.senderId == request.auth.uid;
+      allow update, delete: if false; // Messages are immutable
+    }
+  }
+}

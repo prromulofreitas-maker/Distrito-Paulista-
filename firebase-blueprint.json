@@ -1,0 +1,127 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "A user in the pastoral district app.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Firebase Auth UID" },
+        "name": { "type": "string", "description": "User's full name" },
+        "email": { "type": "string", "format": "email", "description": "User's email address" },
+        "role": { "type": "string", "enum": ["admin", "leader", "member"], "description": "User's role" },
+        "departmentId": { "type": "string", "description": "ID of the department the user belongs to (optional)" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp" }
+      },
+      "required": ["uid", "name", "email", "role", "createdAt"]
+    },
+    "Department": {
+      "title": "Department",
+      "description": "A department within the pastoral district.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Department name" },
+        "description": { "type": "string", "description": "Department description" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp" }
+      },
+      "required": ["name", "createdAt"]
+    },
+    "Material": {
+      "title": "Material",
+      "description": "A document or material shared within a department.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "description": "Material title" },
+        "description": { "type": "string", "description": "Material description" },
+        "url": { "type": "string", "description": "URL to the material" },
+        "departmentId": { "type": "string", "description": "ID of the department this material belongs to" },
+        "uploadedBy": { "type": "string", "description": "UID of the user who uploaded the material" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Upload timestamp" }
+      },
+      "required": ["title", "url", "departmentId", "uploadedBy", "createdAt"]
+    },
+    "Event": {
+      "title": "Event",
+      "description": "An event organized by a department or the district.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "description": "Event title" },
+        "description": { "type": "string", "description": "Event description" },
+        "date": { "type": "string", "format": "date-time", "description": "Event date and time" },
+        "location": { "type": "string", "description": "Event location" },
+        "imageUrl": { "type": "string", "description": "URL to an image for the event (optional)" },
+        "departmentId": { "type": "string", "description": "ID of the department organizing the event (optional for district-wide)" },
+        "createdBy": { "type": "string", "description": "UID of the user who created the event" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp" }
+      },
+      "required": ["title", "date", "location", "createdBy", "createdAt"]
+    },
+    "Task": {
+      "title": "Task",
+      "description": "A task assigned to a user.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "description": "Task title" },
+        "description": { "type": "string", "description": "Task description" },
+        "dueDate": { "type": "string", "format": "date-time", "description": "Task due date" },
+        "status": { "type": "string", "enum": ["pending", "completed"], "description": "Task status" },
+        "assignedTo": { "type": "string", "description": "UID of the user assigned to the task" },
+        "departmentId": { "type": "string", "description": "ID of the department this task belongs to" },
+        "createdBy": { "type": "string", "description": "UID of the user who created the task" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp" }
+      },
+      "required": ["title", "status", "assignedTo", "departmentId", "createdBy", "createdAt"]
+    },
+    "Announcement": {
+      "title": "Announcement",
+      "description": "An announcement for the district or a department.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "description": "Announcement title" },
+        "content": { "type": "string", "description": "Announcement content" },
+        "departmentId": { "type": "string", "description": "ID of the department (optional for district-wide)" },
+        "createdBy": { "type": "string", "description": "UID of the user who created the announcement" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp" }
+      },
+      "required": ["title", "content", "createdBy", "createdAt"]
+    },
+    "Message": {
+      "title": "Message",
+      "description": "A chat message.",
+      "type": "object",
+      "properties": {
+        "text": { "type": "string", "description": "Message content" },
+        "senderId": { "type": "string", "description": "UID of the sender" },
+        "senderName": { "type": "string", "description": "Name of the sender" },
+        "channelId": { "type": "string", "description": "ID of the chat channel" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp" }
+      },
+      "required": ["text", "senderId", "senderName", "channelId", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "Collection of users."
+    },
+    "/departments/{departmentId}": {
+      "schema": { "$ref": "#/entities/Department" },
+      "description": "Collection of departments."
+    },
+    "/materials/{materialId}": {
+      "schema": { "$ref": "#/entities/Material" },
+      "description": "Collection of materials."
+    },
+    "/events/{eventId}": {
+      "schema": { "$ref": "#/entities/Event" },
+      "description": "Collection of events."
+    },
+    "/tasks/{taskId}": {
+      "schema": { "$ref": "#/entities/Task" },
+      "description": "Collection of tasks."
+    },
+    "/announcements/{announcementId}": {
+      "schema": { "$ref": "#/entities/Announcement" },
+      "description": "Collection of announcements."
+    }
+  }
+}
