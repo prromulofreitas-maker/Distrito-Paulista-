@@ -10,6 +10,8 @@ import { Tasks } from './pages/Tasks';
 import { Announcements } from './pages/Announcements';
 import { Directory } from './pages/Directory';
 import { Chat } from './pages/Chat';
+import { Congregations } from './pages/Congregations';
+import { Planning } from './pages/Planning';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -40,6 +42,8 @@ function AppRoutes() {
         <Route path="announcements" element={<Announcements />} />
         <Route path="directory" element={<Directory />} />
         <Route path="chat" element={<Chat />} />
+        <Route path="congregations" element={<Congregations />} />
+        <Route path="planning" element={<Planning />} />
       </Route>
     </Routes>
   );
