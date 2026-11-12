@@ -1,14 +1,16 @@
 import React, { useEffect, useState } from 'react';
-import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
+import { collection, query, orderBy, limit, onSnapshot, where } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
-import { Calendar, Bell, CheckSquare } from 'lucide-react';
-import { format } from 'date-fns';
+import { Calendar, Bell, CheckSquare, Church, Star } from 'lucide-react';
+import { format, nextSaturday, isSaturday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { DEPARTMENTS } from '../constants/departments';
 import { cn } from '../lib/utils';
 import { EventCarousel } from '../components/EventCarousel';
+import { useCongregations } from '../hooks/useCongregations';
+import { dayToIso, getSpecial, type ScheduleEntry } from '../constants/congregations';
 
 export function Dashboard() {
   const { appUser } = useAuth();
@@ -16,6 +18,22 @@ export function Dashboard() {
   const [recentEvents, setRecentEvents] = useState<any[]>([]);
   const [recentAnnouncements, setRecentAnnouncements] = useState<any[]>([]);
   const [pendingTasks, setPendingTasks] = useState<any[]>([]);
+  const { congregations } = useCongregations();
+  const [sabbathEntries, setSabbathEntries] = useState<ScheduleEntry[]>([]);
+  const today = new Date();
+  const sabbathDay = format(isSaturday(today) ? today : nextSaturday(today), 'yyyy-MM-dd');
+
+  useEffect(() => {
+    if (!appUser) return;
+    const q = query(collection(db, 'schedules'), where('date', '==', dayToIso(sabbathDay)));
+    return onSnapshot(q, snapshot => {
+      setSabbathEntries(
+        snapshot.docs
+          .map(d => ({ id: d.id, ...(d.data() as Omit<ScheduleEntry, 'id'>) }))
+          .filter(e => e.serviceId === 'sabado-manha')
+      );
+    });
+  }, [appUser, sabbathDay]);
 
   useEffect(() => {
     if (!appUser) return;
@@ -56,6 +74,49 @@ export function Dashboard() {
       </div>
 
       <EventCarousel events={recentEvents} />
+
+      {/* Próximo sábado nas congregações */}
+      {congregations.length > 0 && (
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-gray-900 flex items-center">
+              <Church className="w-5 h-5 mr-2 text-blue-500" />
+              Culto Divino — {format(new Date(`${sabbathDay}T12:00:00`), "dd 'de' MMMM", { locale: ptBR })}
+            </h2>
+            <button onClick={() => navigate('/planning')} className="text-sm text-blue-600 hover:underline">
+              Ver planejamento
+            </button>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {congregations.map(c => {
+              const entry = sabbathEntries.find(e => e.congregationId === c.id);
+              const special = getSpecial(entry?.specialId);
+              return (
+                <div
+                  key={c.id}
+                  className={cn(
+                    'rounded-md border p-3 text-sm',
+                    entry?.pastorVisit ? 'border-amber-300 bg-amber-50' : 'border-gray-100'
+                  )}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium text-gray-900">{c.name}</span>
+                    {entry?.pastorVisit && <Star className="w-4 h-4 text-amber-500 fill-amber-400" />}
+                  </div>
+                  <div className={cn('mt-1', entry?.preacher ? 'text-gray-700' : 'text-gray-400')}>
+                    {entry?.preacher || 'Pregador a definir'}
+                  </div>
+                  {special && (
+                    <span className={cn('inline-block mt-1 text-[11px] font-medium px-1.5 py-0.5 rounded', special.color)}>
+                      {special.name}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Departments Grid */}
       <div>

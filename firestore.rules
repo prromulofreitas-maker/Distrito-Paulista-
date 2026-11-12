@@ -289,6 +289,56 @@ service cloud.firestore {
       );
     }
 
+    function isValidCongregation() {
+      return hasRequiredFields(['name', 'type', 'createdBy', 'createdAt']) &&
+             hasOnlyAllowedFields(['name', 'type', 'address', 'elderName', 'elderPhone', 'membersCount',
+                                   'baptismGoal', 'baptismsDone', 'notes', 'createdBy', 'createdAt']) &&
+             isValidString('name', 1, 100) &&
+             request.resource.data.type in ['igreja', 'grupo'] &&
+             isValidOptionalString('address', 0, 200) &&
+             isValidOptionalString('elderName', 0, 100) &&
+             isValidOptionalString('elderPhone', 0, 30) &&
+             isValidOptionalString('notes', 0, 1000) &&
+             (!('membersCount' in request.resource.data) || (request.resource.data.membersCount is int && request.resource.data.membersCount >= 0)) &&
+             (!('baptismGoal' in request.resource.data) || (request.resource.data.baptismGoal is int && request.resource.data.baptismGoal >= 0)) &&
+             (!('baptismsDone' in request.resource.data) || (request.resource.data.baptismsDone is int && request.resource.data.baptismsDone >= 0)) &&
+             isValidString('createdBy', 1, 128) &&
+             isValidDateString(request.resource.data.createdAt);
+    }
+
+    function isValidSchedule() {
+      return hasRequiredFields(['congregationId', 'date', 'serviceId', 'pastorVisit', 'createdBy', 'createdAt']) &&
+             hasOnlyAllowedFields(['congregationId', 'date', 'serviceId', 'preacher', 'theme', 'specialId',
+                                   'pastorVisit', 'notes', 'createdBy', 'createdAt']) &&
+             isValidString('congregationId', 1, 128) &&
+             isValidDateString(request.resource.data.date) &&
+             request.resource.data.serviceId in ['sabado-manha', 'sabado-tarde', 'domingo-noite', 'quarta-noite'] &&
+             isValidOptionalString('preacher', 0, 100) &&
+             isValidOptionalString('theme', 0, 200) &&
+             isValidOptionalString('specialId', 1, 64) &&
+             request.resource.data.pastorVisit is bool &&
+             isValidOptionalString('notes', 0, 1000) &&
+             isValidString('createdBy', 1, 128) &&
+             isValidDateString(request.resource.data.createdAt);
+    }
+
+    // Congregações: todos leem; líderes e admins cadastram/editam; só admin exclui
+    match /congregations/{congregationId} {
+      allow read: if isAuthenticated();
+      allow create: if isLeader() && isValidCongregation() && request.resource.data.createdBy == request.auth.uid;
+      allow update: if isLeader() && isValidCongregation() && areImmutableFieldsUnchanged(['createdBy', 'createdAt']);
+      allow delete: if isAdmin();
+    }
+
+    // Planejamento (escala de cultos): todos leem; líderes e admins editam
+    match /schedules/{scheduleId} {
+      allow read: if isAuthenticated();
+      allow create: if isLeader() && isValidSchedule() && request.resource.data.createdBy == request.auth.uid;
+      allow update: if isLeader() && isValidSchedule() &&
+                    areImmutableFieldsUnchanged(['createdBy', 'createdAt', 'congregationId', 'date', 'serviceId']);
+      allow delete: if isLeader();
+    }
+
     match /messages/{messageId} {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated() && 

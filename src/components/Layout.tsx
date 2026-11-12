@@ -11,7 +11,9 @@ import {
   LogOut,
   Menu,
   X,
-  MessageSquare
+  MessageSquare,
+  Church,
+  CalendarRange
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 
@@ -22,6 +24,8 @@ export function Layout() {
 
   const navigation = [
     { name: 'Dashboard', href: '/', icon: LayoutDashboard },
+    { name: 'Congregações', href: '/congregations', icon: Church },
+    { name: 'Planejamento', href: '/planning', icon: CalendarRange },
     { name: 'Chat', href: '/chat', icon: MessageSquare },
     { name: 'Materiais', href: '/materials', icon: Files },
     { name: 'Eventos', href: '/events', icon: Calendar },
@@ -33,7 +37,7 @@ export function Layout() {
   return (
     <div className="min-h-screen bg-gray-50 flex">
       {/* Mobile menu button */}
-      <div className="lg:hidden fixed top-0 left-0 w-full bg-white border-b border-gray-200 z-50 px-4 py-3 flex items-center justify-between">
+      <div className="lg:hidden print:hidden fixed top-0 left-0 w-full bg-white border-b border-gray-200 z-50 px-4 py-3 flex items-center justify-between">
         <div className="font-bold text-lg text-blue-600 truncate">Distrito de Paulista</div>
         <button
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
@@ -45,7 +49,7 @@ export function Layout() {
 
       {/* Sidebar */}
       <div className={cn(
-        "fixed inset-y-0 left-0 z-40 w-64 bg-white border-r border-gray-200 transform transition-transform duration-200 ease-in-out lg:translate-x-0 lg:static lg:block",
+        "print:hidden fixed inset-y-0 left-0 z-40 w-64 bg-white border-r border-gray-200 transform transition-transform duration-200 ease-in-out lg:translate-x-0 lg:static lg:block",
         isMobileMenuOpen ? "translate-x-0 mt-14 lg:mt-0" : "-translate-x-full"
       )}>
         <div className="h-full flex flex-col">
@@ -105,7 +109,7 @@ export function Layout() {
       </div>
 
       {/* Main content */}
-      <div className="flex-1 flex flex-col min-w-0 pt-14 lg:pt-0">
+      <div className="flex-1 flex flex-col min-w-0 pt-14 lg:pt-0 print:pt-0">
         <main className="flex-1 p-4 sm:p-6 lg:p-8">
           <Outlet />
         </main>
